@@ -1,27 +1,24 @@
-package com.example.workpathsample
+package com.example.workpathsample.ui.auth
 
 import android.app.AlertDialog
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import com.example.workpathsample.R
 import com.example.workpathsample.task.InitializationTask
 import com.example.workpathsample.ui.theme.WorkpathSampleTheme
-import com.google.gson.Gson
 import com.hp.workpath.api.Result
 import com.hp.workpath.api.SsdkUnsupportedException
 import com.hp.workpath.api.access.AccessService
@@ -34,8 +31,82 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class CaletaAuthenticationActivity : ComponentActivity() {
-    private var isInitializedSDK = false
     private lateinit var mAlertDialog: AlertDialog
+
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            WorkpathSampleTheme {
+                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding)
+                            .background(Color.White)
+                    ) {
+                        LoginForm {
+                            val result = Result()
+                            val signInAction = SignInAction(SignInAction.Action.SUCCESS, null)
+                            AccessService.signIn(
+                                this@CaletaAuthenticationActivity,
+                                signInAction,
+                                windowsData,
+                                result
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        lifecycleScope.launch(Dispatchers.Default) {
+            InitializationTask(this@CaletaAuthenticationActivity, initializeInterface).execute()
+        }
+    }
+
+    private var initializeInterface: InitializationTask.InitializeInterface = object :
+        InitializationTask.InitializeInterface {
+        override fun handleComplete() {}
+
+        override fun handleException(t: Throwable?) {
+            this@CaletaAuthenticationActivity.handleException(t)
+        }
+    }
+
+    private fun handleException(t: Throwable?) {
+        var errorMsg = ""
+        if (t is SsdkUnsupportedException) {
+            errorMsg = when (t.type) {
+                SsdkUnsupportedException.LIBRARY_NOT_INSTALLED, SsdkUnsupportedException.LIBRARY_UPDATE_IS_REQUIRED -> getString(
+                    R.string.sdk_support_missing
+                )
+
+                else -> getString(R.string.unknown_error)
+            }
+        } else {
+            t?.message?.run {
+                errorMsg = this
+            }
+        }
+        Log.e("CaletaAuthneticationActivity", errorMsg)
+        mAlertDialog = AlertDialog.Builder(this@CaletaAuthenticationActivity)
+            .setTitle("Error")
+            .setMessage(errorMsg)
+            .setCancelable(false)
+            .setPositiveButton(android.R.string.ok) { dialog, _ ->
+                dialog.dismiss()
+                finish()
+            }
+            .show()
+    }
+
 
     @get:Throws(Exception::class)
     private val windowsData: AuthenticationAttributes
@@ -100,71 +171,6 @@ class CaletaAuthenticationActivity : ComponentActivity() {
                 .build()
         }
 
-
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
-            WorkpathSampleTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding)
-                            .background(Color.White)
-                    ) {
-                        LoginForm {
-                            val result = Result()
-                            val signInAction = SignInAction(SignInAction.Action.SUCCESS, null)
-                            AccessService.signIn(
-                                this@CaletaAuthenticationActivity,
-                                signInAction,
-                                windowsData,
-                                result
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-/*        lifecycleScope.launch(Dispatchers.Default) {
-            InitializationTask(this@CaletaAuthenticationActivity).execute()
-        }*/
-    }
-
-    fun handleComplete() {
-        isInitializedSDK = true
-    }
-
-    fun handleException(t: Throwable?) {
-        var errorMsg = ""
-        if (t is SsdkUnsupportedException) {
-            errorMsg = when (t.type) {
-                SsdkUnsupportedException.LIBRARY_NOT_INSTALLED, SsdkUnsupportedException.LIBRARY_UPDATE_IS_REQUIRED -> "SDK is not installed or needs to be updated"
-                else -> "Unknown Error"
-            }
-        } else {
-            t?.message?.run {
-                errorMsg = this
-            }
-        }
-        mAlertDialog = AlertDialog.Builder(this)
-            .setTitle("Error")
-            .setMessage(errorMsg)
-            .setCancelable(false)
-            .setPositiveButton(android.R.string.ok) { dialog, _ ->
-                dialog.dismiss()
-                finish()
-            }
-            .show()
-    }
 }
 
 

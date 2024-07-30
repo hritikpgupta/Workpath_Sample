@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="com.hp.jetadvantage.link.permission.SERVICES_PERMISSION" />
 
     <application
         android:allowBackup="true"
@@ -15,13 +17,13 @@
         android:theme="@style/Theme.WorkpathSample"
         tools:targetApi="31">
         <activity
-            android:name=".CaletaAuthenticationActivity"
-            android:exported="false"
+            android:name=".ui.auth.CaletaAuthenticationActivity"
+            android:exported="true"
             android:windowSoftInputMode="stateHidden"
             android:label="@string/title_activity_caleta_authentication"
             android:theme="@style/Theme.WorkpathSample" />
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.home.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.WorkpathSample">
@@ -30,6 +32,24 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service android:name=".task.services.AuthenticationAgentService"
+            android:permission="com.hp.jetadvantage.link.permission.SERVICES_PERMISSION"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.hp.jetadvantage.link.api.action.AUTHENTICATION" />
+            </intent-filter>
+        </service>
+
+        <receiver android:name=".task.receiver.AccessoryReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.hp.jetadvantage.link.action.ACCESSORY_READY" />
+                <action android:name="com.hp.workpath.action.ACCESSORY_STATUS_ACTION"/>
+                <action android:name="com.hp.workpath.action.ACCESSORY_REPORT_ACTION"/>
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

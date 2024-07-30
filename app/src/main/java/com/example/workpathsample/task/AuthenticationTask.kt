@@ -1,12 +1,13 @@
 package com.example.workpathsample.task
 
-import com.example.workpathsample.MainActivity
+import android.content.Context
+import com.example.workpathsample.ui.home.MainActivity
 import com.hp.workpath.api.access.AccessService
 import com.hp.workpath.api.access.Principal
 
-class AuthenticationInfoTask(var context: MainActivity) {
+class AuthenticationTask(private var context: Context) {
 
-     fun getAuthenticatedUserInfo(): Principal? {
+     suspend fun getAuthenticatedUserInfo(): Principal? {
          try {
              val principal = AccessService.getCurrentPrincipal(context, null)
              if (principal != null) {

@@ -1,62 +1,77 @@
 package com.example.workpathsample.task
 
-import android.app.Application
 import android.content.Context
 import android.util.Log
-import com.example.workpathsample.CaletaAuthenticationActivity
+import com.example.workpathsample.R
 import com.hp.workpath.api.SsdkUnsupportedException
 import com.hp.workpath.api.Workpath
 import com.hp.workpath.api.access.AccessService
+import com.hp.workpath.api.accessory.hid.AccessoryService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.lang.ref.WeakReference
 
-class InitializationTask(val context: Context) {
-
+class InitializationTask(context: Context, private val initializeInterface: InitializeInterface?) {
     private var mThrowable: Throwable? = null
-    //private val mContextRef: WeakReference<?> = WeakReference(context)
+    private val mContextRef: WeakReference<Context> = WeakReference(context)
+    private val DEFAULT_RETRIES = 5
 
-    suspend fun execute() {
-        var status = InitStatus.NO_ERROR
-
-        context.run {
-            try {
-                Log.i("InitializationTask", "Initializing Workpath SDK")
-                Workpath.getInstance().initialize(this)
-                if (!AccessService.isSupported(this)) {
-                    status = InitStatus.NOT_SUPPORTED
-                }
-            } catch (sue: SsdkUnsupportedException) {
-                mThrowable = sue
-                status = InitStatus.INIT_EXCEPTION
-            } catch (se: SecurityException) {
-                mThrowable = se
-                status = InitStatus.INIT_EXCEPTION
-            } catch (t: Throwable) {
-                mThrowable = t
-                status = InitStatus.INIT_EXCEPTION
-            }
-
-            onPostExecute(status, context)
-        }
+    interface InitializeInterface {
+        fun handleComplete()
+        fun handleException(t: Throwable?)
     }
 
-    private suspend fun onPostExecute(status: InitStatus, context: Context) {
+    suspend fun execute(): InitStatus {
+        var status = InitStatus.INIT_EXCEPTION
+        var numberOfRetries = 0
+        while (status == InitStatus.INIT_EXCEPTION && numberOfRetries < DEFAULT_RETRIES) {
+            numberOfRetries++
+            mContextRef.get()?.run {
+                try {
+                    // initialize Workpath SDK
+                    Workpath.getInstance().initialize(this)
+                    status = InitStatus.NO_ERROR
+                } catch (sue: SsdkUnsupportedException) {
+                    mThrowable = sue
+                    status = InitStatus.INIT_EXCEPTION
+                } catch (se: SecurityException) {
+                    mThrowable = se
+                    status = InitStatus.INIT_EXCEPTION
+                } catch (t: Throwable) {
+                    mThrowable = t
+                    status = InitStatus.INIT_EXCEPTION
+                }
+
+                // Check if AccessoryService or AccessService is supported
+                if (status == InitStatus.NO_ERROR
+                    && !AccessoryService.isSupported(this)
+                    && !AccessService.isSupported(this)) {
+                    // AccessoryService or AccessService is not supported on this device
+                    status = InitStatus.NOT_SUPPORTED
+                }
+            }
+            delay(1000 * 30.toLong())
+        }
+
+        if (initializeInterface != null) {
+            onPostExecute(status)
+        }
+        return status
+    }
+
+    private suspend fun onPostExecute(status: InitStatus) {
         withContext(Dispatchers.Main) {
-            context.run {
-                Log.i("InitializationTask", "onPostExecute $status")
+            mContextRef.get()?.run {
                 if (status == InitStatus.NO_ERROR) {
-                    val principal = AccessService.getCurrentPrincipal(context, null)
-                    if (principal != null) {
-                        Log.i("InitializationTask", principal.toString())
-                    } else {
-                        Log.i("InitializationTask", "Principal is null")
-                    }
-                    //handleComplete()
+                    initializeInterface?.handleComplete()
                 } else {
-                    //handleException(mThrowable)
-                    Log.i("InitializationTask", "Initialization Error")
-                    Log.i("InitializationTask", mThrowable.toString())
+                    when (status) {
+                        InitStatus.INIT_EXCEPTION -> initializeInterface?.handleException(mThrowable)
+                        InitStatus.NOT_SUPPORTED -> initializeInterface?.handleException(Exception(getString(
+                            R.string.service_not_supported)))
+                        else -> initializeInterface?.handleException(Exception(getString(R.string.unknown_error)))
+                    }
                 }
             }
         }
